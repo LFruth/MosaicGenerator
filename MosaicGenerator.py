@@ -20,7 +20,7 @@ class MosaicGenerator:
     Every Voronoi region is a Mosaic tile
     """
 
-    def __init__(self, img_path, num_tiles):
+    def __init__(self, img_path, num_tiles, rand_factor=0.0, intensity_factor=1.0):
         """
         :param img_path: file path to the image
         :param num_tiles: number of mosaic tiles to generate
@@ -33,10 +33,12 @@ class MosaicGenerator:
         self.y_size = self.img.shape[0]
 
         # edge detection
-        #edges = cv2.Canny(self.img_path, 100, 200)
-        #cv2.imshow("Edges", edges)
+        # edges = cv2.Canny(self.img_path, 100, 200)
+        # cv2.imshow("Edges", edges)
 
         self.num_tiles = num_tiles
+        self.rand_factor = rand_factor
+        self.intensity_factor = intensity_factor
 
         # assign random points on the image
         self.points = np.array(
@@ -59,7 +61,6 @@ class MosaicGenerator:
 
             self.points = np.append(self.points, [[x, y]], axis=0)
 
-
     def calculateMosaic(self):
         """
         Calculates the Voronoi based on the assigned points
@@ -71,35 +72,91 @@ class MosaicGenerator:
         self.ridge_vertices = vor.ridge_vertices
         self.regions = vor.regions
 
-    def getAverageRegionColor(self, px, py, num_neighbor_pixel=1):
+    # TODO: Documentation
+    def getPixelRGB(self, x, y):
+        if 0 <= x < self.x_size and 0 <= y < self.y_size:
+            color = None
+            try:
+                color = self.img[y][x]
+            except:
+                return None
+            r = color[2]
+            g = color[1]
+            b = color[0]
+            return [r, g, b]
+        else:
+            return None
+
+    def getAverageRegionColor(self, px, py, region_verts, num_neighbor_pixel=1):
         """
         Returns the average pixel color of a pixel and its surrounding pixels
         :param px: the x value of the pixel
         :param py: the y value of the pixel
+        :param region_verts: the vertices of the region, in case midpoint is not in the image
         :param num_neighbor_pixel: number of neighbour pixels to consider (=1 means 9 pixels get considered)
         :return: the average color of the considered pixels [r, g, b]
         """
-
         clrsum = [0, 0, 0]
 
         count = 0
-        for x in range(px-num_neighbor_pixel, px+num_neighbor_pixel+1):
-            for y in range(py-num_neighbor_pixel, py+num_neighbor_pixel+1):
-                # Check if the pixel is in the image
-                if x >= 0 and x < self.x_size and y >= 0 and y < self.y_size:
-                    clrsum[0] += self.img[y][x][2]
-                    clrsum[1] += self.img[y][x][1]
-                    clrsum[2] += self.img[y][x][0]
+        for x in range(px - num_neighbor_pixel, px + num_neighbor_pixel + 1):
+            for y in range(py - num_neighbor_pixel, py + num_neighbor_pixel + 1):
+                pixel_clr = self.getPixelRGB(x, y)
+                if pixel_clr:
+                    clrsum[0] += pixel_clr[0]
+                    clrsum[1] += pixel_clr[1]
+                    clrsum[2] += pixel_clr[2]
                     count += 1
 
         if count != 0:
             for i in range(len(clrsum)):
                 clrsum[i] /= count
+                clrsum[i] *= self.intensity_factor
+
         else:
-            None
-            #TODO: Randteile richtig einfärben..
+            # px, py and neighbours not in image -> get colors from vertices
+            for v in region_verts:
+                x = self.verts[v][0]
+                y = self.verts[v][1]
+                pixel_clr = self.getPixelRGB(x, y)
+                # TODO: Warum immer None?????
+                if pixel_clr:
+                    clrsum[0] += pixel_clr[0]
+                    clrsum[1] += pixel_clr[1]
+                    clrsum[2] += pixel_clr[2]
+                    count += 1
+
+            if count != 0:
+                for i in range(len(clrsum)):
+                    clrsum[i] /= count
+                    clrsum[i] *= self.intensity_factor
+
+        for i in range(len(clrsum)):
+            if clrsum[i] > 255:
+                clrsum[i] = 255
 
         return clrsum
+
+
+    def randomizeColor(self, clr):
+        """
+        Randomizes the given color(clr) by self.rand_factor
+        TODO: in helper module auslagern
+        """
+
+        if self.rand_factor == 0.0:
+            return clr
+
+        val = 255 * self.rand_factor
+        for i in range(len(clr)):
+            start = int(clr[i] - val)
+            end = int(clr[i] + val)
+            if start < 0:
+                start = 0
+            if end > 256:
+                end = 256
+            clr[i] = randrange(start, end)
+        return clr
 
     def drawRegions(self):
         """
@@ -124,7 +181,9 @@ class MosaicGenerator:
                 midpoint[1] = int(midpoint[1] / len(r))
 
                 # get the pixel color of this midpoint
-                clr = self.getAverageRegionColor(midpoint[0], midpoint[1], num_neighbor_pixel=1)
+                clr = self.getAverageRegionColor(midpoint[0], midpoint[1], r, num_neighbor_pixel=1)
+                # randomize color
+                clr = self.randomizeColor(clr)
                 # draw the pygame polygon
                 pygame.draw.polygon(self.screen, clr, polygon_points)
 
@@ -149,6 +208,7 @@ class MosaicGenerator:
         """
         Saves the generated pygame mosaic image as temporary image (temp.jpg)
         """
+
         pygame.init()
         pygame.display.iconify()
         self.screen = pygame.display.set_mode([self.x_size, self.y_size], display=pygame.FULLSCREEN)
@@ -181,52 +241,56 @@ class Window(Frame):
         Inits the tkinter-elements in a grid form
         """
 
-        #----------1. Row----------#
+        # ----------1. Row---------- #
         filepath_label = Label(self, text="Image file path:")
-        filepath_label.grid(row=0, column=0, rowspan=1)
+        filepath_label.grid(row=0, column=0, rowspan=1, sticky="w")
 
         self.path_entry = Entry(self, width=30)
-        self.path_entry.grid(row=0, column=1, rowspan=1, columnspan=2)
+        self.path_entry.grid(row=0, column=1, rowspan=1, columnspan=2, sticky="w")
 
         choose_btn = Button(self, text="Load Image", command=self.fileDialog)
         choose_btn.grid(row=0, column=3, rowspan=1, columnspan=1)
-        '''
-        #----------2.Row----------#
-        self.mintreshold_entry = Entry(self)
-        self.mintreshold_entry.insert(0, "100")
-        self.mintreshold_entry.grid(row=1, column=0, rowspan=1, columnspan=1)
 
-        self.maxtreshold_entry = Entry(self)
-        self.maxtreshold_entry.insert(0, "200")
-        self.maxtreshold_entry.grid(row=1, column=1, rowspan=1, columnspan=1)
-
-        self.showcanny_button = Button(self, text="show_edges", command=self.showCanny)
-        self.showcanny_button.grid(row=1, column=2, rowspan=1, columnspan=1)
-        '''
-        #----------3.Row----------#
+        # ----------2.Row---------- #
         tilenum_label = Label(self, text="Number of Mosaic Tiles:")
-        tilenum_label.grid(row=2, column=0, rowspan=1, columnspan=1)
+        tilenum_label.grid(row=1, column=0, rowspan=1, columnspan=1, sticky="w")
 
         self.tilenum_entry = Entry(self)
         self.tilenum_entry.insert(0, "100000")
-        self.tilenum_entry.grid(row=2, column=1, rowspan=1, columnspan=1)
+        self.tilenum_entry.grid(row=1, column=1, rowspan=1, columnspan=1)
 
         self.pixel_label = Label(self, text="")
-        self.pixel_label.grid(row=2, column=2, rowspan=1, columnspan=1)
+        self.pixel_label.grid(row=1, column=2, rowspan=1, columnspan=1)
 
-        #----------4.Row----------#
+        # ----------3.Row---------- #
+        colorrand_label = Label(self, text="Color randomization (0.01 = 1%):")
+        colorrand_label.grid(row=2, column=0, rowspan=1, columnspan=1, sticky="e")
+
+        self.colorrand_factor = Entry(self)
+        self.colorrand_factor.insert(0, "0.00")
+        self.colorrand_factor.grid(row=2, column=1, rowspan=1, columnspan=1)
+
+        # ----------4.Row---------- #
+        intensity_label = Label(self, text="Color Intensity:")
+        intensity_label.grid(row=3, column=0, rowspan=1, columnspan=1, sticky="w")
+
+        self.intensity_factor_entry = Entry(self)
+        self.intensity_factor_entry.insert(0, "1.0")
+        self.intensity_factor_entry.grid(row=3, column=1, rowspan=1, columnspan=1)
+
+        # ----------5.Row---------- #
         create_btn = Button(self, text="Create Mosaic", command=self.createMosaic)
-        create_btn.grid(row=3, column=0, rowspan=1, columnspan=1)
+        create_btn.grid(row=4, column=0, rowspan=1, columnspan=1)
 
         self.loading_label = Label(self, text="")
-        self.loading_label.grid(row=3, column=1, rowspan=1, columnspan=1)
+        self.loading_label.grid(row=4, column=1, rowspan=1, columnspan=1)
 
-        #----------5. Row----------#
+        # ----------6. Row---------- #
         self.preview_btn = Button(self, text="Preview Image", command=self.prevImage, state="disabled")
-        self.preview_btn.grid(row=4, column=1, rowspan=1, columnspan=1)
+        self.preview_btn.grid(row=5, column=1, rowspan=1, columnspan=1)
 
         self.save_btn = Button(self, text="Save Image", command=self.saveImage, state="disabled")
-        self.save_btn.grid(row=4, column=2, rowspan=1, columnspan=1)
+        self.save_btn.grid(row=5, column=2, rowspan=1, columnspan=1)
 
     def fileDialog(self):
         """
@@ -241,9 +305,8 @@ class Window(Frame):
         x_size = self.img.shape[1]
         y_size = self.img.shape[0]
 
-        self.pixel_label['text'] = "Pixels: " + str(x_size) + " | " + str(y_size)\
-                                   + " = " + str(x_size*y_size)
-
+        self.pixel_label['text'] = str(x_size) + "x" + str(y_size) \
+                                   + " = " + str(x_size * y_size) + " Pixels"
 
     def createMosaic(self):
         """
@@ -267,7 +330,11 @@ class Window(Frame):
         self.loading_label['text'] = "Loading..."
         self.loading_label.update()
 
-        mosaic = MosaicGenerator(filepath_str, int(tilenum_str))
+        rand_factor = float(self.colorrand_factor.get())
+        intensity_factor = float(self.intensity_factor_entry.get())
+
+        mosaic = MosaicGenerator(filepath_str, int(tilenum_str), rand_factor=rand_factor,
+                                 intensity_factor=intensity_factor)
         mosaic.calculateMosaic()
         mosaic.saveTempImage()
 
@@ -305,7 +372,7 @@ class Window(Frame):
 
 
 def dist(p1, p2):
-    return sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2)
+    return sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
 
 
 def isint(s):
