@@ -3,15 +3,13 @@ import sys
 import cv2
 import pygame
 import subprocess
-import multiprocessing
 import numpy as np
 
 from tkinter import Tk, Frame, Button, Label, Entry
-from tkinter import filedialog
+from tkinter import filedialog, colorchooser
 from scipy.spatial import Voronoi
 from random import randrange
 from math import sqrt
-from functools import partial
 
 
 class MosaicGenerator:
@@ -20,7 +18,7 @@ class MosaicGenerator:
     Every Voronoi region is a Mosaic tile
     """
 
-    def __init__(self, img_path, num_tiles, rand_factor=0.0, intensity_factor=1.0):
+    def __init__(self, img_path, num_tiles, rand_factor=0.0, intensity_factor=1.0, ridge_color=(0,0,0)):
         """
         :param img_path: file path to the image
         :param num_tiles: number of mosaic tiles to generate
@@ -39,6 +37,7 @@ class MosaicGenerator:
         self.num_tiles = num_tiles
         self.rand_factor = rand_factor
         self.intensity_factor = intensity_factor
+        self.ridge_color = ridge_color
 
         # assign random points on the image
         self.points = np.array(
@@ -72,8 +71,13 @@ class MosaicGenerator:
         self.ridge_vertices = vor.ridge_vertices
         self.regions = vor.regions
 
-    # TODO: Documentation
     def getPixelRGB(self, x, y):
+        """
+        Returns the rgb of a certain pixel on the image
+        :param x: x coordinate of the pixel
+        :param y: y coordinate of the pixel
+        :return: the pixel color(rgb) or None if coordinates outside of the image
+        """
         if 0 <= x < self.x_size and 0 <= y < self.y_size:
             color = None
             try:
@@ -187,10 +191,10 @@ class MosaicGenerator:
                 # draw the pygame polygon
                 pygame.draw.polygon(self.screen, clr, polygon_points)
 
-    def drawRidges(self, clr=(0, 0, 0)):
+    def drawRidges(self):
         """
         Draws the ridges between the voronoi vertices as pygame aalines -> the outline of the mosaic tiles
-        :param clr: the color of the ridge line
+        Color used: self.ridge_color
         """
 
         for i in range(len(self.ridge_vertices)):
@@ -202,7 +206,7 @@ class MosaicGenerator:
             end_point = [int(p2[0]), int(p2[1])]
 
             if r[0] != -1:
-                pygame.draw.aaline(self.screen, clr, start_point, end_point)
+                pygame.draw.aaline(self.screen, self.ridge_color, start_point, end_point)
 
     def saveTempImage(self):
         """
@@ -232,14 +236,17 @@ class Window(Frame):
         """
         :param parent: the tkinter parent
         """
+
         self.parent = parent
         super(Window, self).__init__(parent)
+        self.ridge_color = (0, 0, 0)
         self.initUI()
 
     def initUI(self):
         """
         Inits the tkinter-elements in a grid form
         """
+        #TODO: Naming rows....
 
         # ----------1. Row---------- #
         filepath_label = Label(self, text="Image file path:")
@@ -279,18 +286,28 @@ class Window(Frame):
         self.intensity_factor_entry.grid(row=3, column=1, rowspan=1, columnspan=1)
 
         # ----------5.Row---------- #
+        ridgeclr_label = Label(self, text="Ridge Color:")
+        ridgeclr_label.grid(row=4, column=0, rowspan=1, columnspan=1, sticky="w")
+
+        self.ridgeclr_display = Label(self, bg='#%02x%02x%02x' % self.ridge_color, width=10)  # Converts RGB to HEX
+        self.ridgeclr_display.grid(row=4, column=1, rowspan=1, columnspan=1, sticky="w")
+
+        ridgeclr_button = Button(self, text="Choose Color", command=self.colorChooser)
+        ridgeclr_button.grid(row=4, column=2, rowspan=1, columnspan=1)
+
+        # ----------6.Row---------- #
         create_btn = Button(self, text="Create Mosaic", command=self.createMosaic)
-        create_btn.grid(row=4, column=0, rowspan=1, columnspan=1)
+        create_btn.grid(row=5, column=0, rowspan=1, columnspan=1)
 
         self.loading_label = Label(self, text="")
-        self.loading_label.grid(row=4, column=1, rowspan=1, columnspan=1)
+        self.loading_label.grid(row=5, column=1, rowspan=1, columnspan=1)
 
-        # ----------6. Row---------- #
+        # ----------7. Row---------- #
         self.preview_btn = Button(self, text="Preview Image", command=self.prevImage, state="disabled")
-        self.preview_btn.grid(row=5, column=1, rowspan=1, columnspan=1)
+        self.preview_btn.grid(row=6, column=1, rowspan=1, columnspan=1)
 
         self.save_btn = Button(self, text="Save Image", command=self.saveImage, state="disabled")
-        self.save_btn.grid(row=5, column=2, rowspan=1, columnspan=1)
+        self.save_btn.grid(row=6, column=2, rowspan=1, columnspan=1)
 
     def fileDialog(self):
         """
@@ -307,6 +324,17 @@ class Window(Frame):
 
         self.pixel_label['text'] = str(x_size) + "x" + str(y_size) \
                                    + " = " + str(x_size * y_size) + " Pixels"
+
+    def colorChooser(self):
+        """
+        Opens a color chooser dialog and sets the ridge_color
+        """
+        openclr = self.ridge_color
+        selected_color = colorchooser.askcolor(self.ridge_color)
+        if selected_color[0]:
+            self.ridge_color = tuple([int(x) for x in selected_color[0]])
+            self.ridgeclr_display['bg'] = '#%02x%02x%02x' % self.ridge_color
+
 
     def createMosaic(self):
         """
@@ -334,7 +362,7 @@ class Window(Frame):
         intensity_factor = float(self.intensity_factor_entry.get())
 
         mosaic = MosaicGenerator(filepath_str, int(tilenum_str), rand_factor=rand_factor,
-                                 intensity_factor=intensity_factor)
+                                 intensity_factor=intensity_factor, ridge_color=self.ridge_color)
         mosaic.calculateMosaic()
         mosaic.saveTempImage()
 
