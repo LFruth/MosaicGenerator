@@ -286,8 +286,8 @@ class Window(Frame):
         self.intensity_factor_entry.grid(row=3, column=1, rowspan=1, columnspan=1)
 
         # ----------5.Row---------- #
-        ridgeclr_label = Label(self, text="Ridge Color:")
-        ridgeclr_label.grid(row=4, column=0, rowspan=1, columnspan=1, sticky="w")
+        ridgeclr_label = Label(self, text="Color of Tile outline:")
+        ridgeclr_label.grid(row=4, column=0, rowspan=1, columnspan=1, sticky="w") 
 
         self.ridgeclr_display = Label(self, bg='#%02x%02x%02x' % self.ridge_color, width=10)  # Converts RGB to HEX
         self.ridgeclr_display.grid(row=4, column=1, rowspan=1, columnspan=1, sticky="w")
