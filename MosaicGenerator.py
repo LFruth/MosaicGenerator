@@ -123,7 +123,7 @@ class MosaicGenerator:
                 x = self.verts[v][0]
                 y = self.verts[v][1]
                 pixel_clr = self.getPixelRGB(x, y)
-                # TODO: Warum immer None?????
+                # TODO: Warum None?????
                 if pixel_clr:
                     clrsum[0] += pixel_clr[0]
                     clrsum[1] += pixel_clr[1]
@@ -287,7 +287,7 @@ class Window(Frame):
 
         # ----------5.Row---------- #
         ridgeclr_label = Label(self, text="Color of Tile outline:")
-        ridgeclr_label.grid(row=4, column=0, rowspan=1, columnspan=1, sticky="w") 
+        ridgeclr_label.grid(row=4, column=0, rowspan=1, columnspan=1, sticky="w")
 
         self.ridgeclr_display = Label(self, bg='#%02x%02x%02x' % self.ridge_color, width=10)  # Converts RGB to HEX
         self.ridgeclr_display.grid(row=4, column=1, rowspan=1, columnspan=1, sticky="w")
