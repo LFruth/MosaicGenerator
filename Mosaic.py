@@ -214,10 +214,10 @@ class MosaicGenerator:
         cv2.imwrite("temp_" + path, image)
 
         pygame.init()
-        pygame.display.iconify()
-        self.screen = pygame.display.set_mode([self.x_size, self.y_size], display=pygame.FULLSCREEN)
+        self.screen = pygame.display.set_mode([self.x_size, self.y_size], display=1)
         pyg_img = pygame.image.load("temp_" + path)
         self.screen.blit(pyg_img, [0, 0])
+        pygame.display.iconify()
 
         self.drawRegions()
         self.drawRidges()
