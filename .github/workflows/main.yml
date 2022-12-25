@@ -17,4 +17,9 @@ jobs:
     - name: Package Application
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
-        path: MosaicGenerator.spec
+        path: ./MosaicGenerator.spec
+    
+    - uses: actions/upload-artifact@v2
+      with:
+        name: my-app
+        path: dist/windows
