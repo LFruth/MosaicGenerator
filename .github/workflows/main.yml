@@ -13,13 +13,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-
-    - name: Package Application
-      uses: JackMcKew/pyinstaller-action-windows@main
+    - uses: actions/setup-python@v2
       with:
-        path: ./MosaicGenerator.spec
-    
+        python-version: 3.9
+
+    - run: pip install -r requirements.txt pyinstaller
+    - run: pyinstaller MosaicGenerator.spec
+    # Optionally verify that it works (provided that it does not need user interaction)
+    - run: ./dist/MosaicGenerator.exe
     - uses: actions/upload-artifact@v2
       with:
-        name: my-app
-        path: dist/windows
+        path: dist/*
