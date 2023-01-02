@@ -22,7 +22,6 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         name: mosaic_generator
-        path: artifacts/
         
     - name: release
       uses: actions/create-release@v1
