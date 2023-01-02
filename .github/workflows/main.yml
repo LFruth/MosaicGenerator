@@ -19,6 +19,7 @@ jobs:
 
     - run: pip install -r requirements.txt pyinstaller
     - run: pyinstaller MosaicGenerator.spec
+    
     - uses: actions/upload-artifact@v2
       with:
         name: mosaic_generator
@@ -46,8 +47,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-        asset_path: dist/MosaicGenerator
-        asset_name: mosaic_generator
+        asset_path: dist/*
+        asset_name: mosaic_generator.zip
         asset_content_type: application/zip
         
     
